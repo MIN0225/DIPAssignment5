@@ -1,24 +1,19 @@
 import cv2
 import numpy as np
 
-# original image
-original = cv2.imread('dgu_gray.png', 0)
-
 def getImage(grayscale = False, scale = 0.5):
 
   if grayscale:
     grayscale = 0
   else:
     grayscale = 1
-  gt = cv2.imread('dgu_gray.png', grayscale)
-  gt = cv2.resize(gt, (0,0), fx = scale, fy = scale)
-  return gt
+  original = cv2.imread('dgu_gray.png', grayscale)
+  gt = cv2.resize(original, (0,0), fx = scale, fy = scale)
+  return [original, gt]
 
 
 def addNoise(image, mean = 0,  sigma = 0.3):
-  ''' 
-  This function takes an image and returns an image that has been noised with the given input parameters.
-  '''
+
   sigma *= 255 #Since the image itself is not normalized
   noise = np.zeros_like(image)
   noise = cv2.randn(noise, mean, sigma)
@@ -47,7 +42,6 @@ def nonLocalMeans(noisy, params = tuple(), verbose = True):
   paddedImage[padwidth:padwidth+image.shape[0], image.shape[1]+padwidth:image.shape[1]+2*padwidth] = np.fliplr(image[:,image.shape[1]-padwidth:image.shape[1]])
   paddedImage[0:padwidth,:] = np.flipud(paddedImage[padwidth:2*padwidth,:])
   paddedImage[padwidth+image.shape[0]:2*padwidth+image.shape[0], :] =np.flipud(paddedImage[paddedImage.shape[0] - 2*padwidth:paddedImage.shape[0] - padwidth,:])
-  
 
   iterator = 0
   totalIterations = image.shape[1]*image.shape[0]*(bigWindowSize - smallWindowSize)**2
@@ -57,7 +51,6 @@ def nonLocalMeans(noisy, params = tuple(), verbose = True):
 
   outputImage = paddedImage.copy()
   smallhalfwidth = smallWindowSize//2
-
 
   # For each pixel in the actual image, find a area around the pixel that needs to be compared
   for imageX in range(padwidth, padwidth + image.shape[1]):
@@ -98,14 +91,13 @@ def nonLocalMeans(noisy, params = tuple(), verbose = True):
 
 def denoise(verbose = False, gaussian = True, salted = True):  # 가우시안 노이즈 더한 이미지, 노이즈 제거한 이미지 반환
 
-  print("denoise() 시작")
   scale = 2 #Scale factor of the image
+  [original, gtImg] = getImage(grayscale = True, scale = scale)
 
   # Noise parameters
   sigma = 0.15 #Gaussian sigma
-  p = 0.035 #Threshold for SNP noise
 
-  gNoised = addNoise(original, sigma = sigma) 
+  gNoised = addNoise(gtImg, sigma = sigma) 
 
   # Parameters for denoising using gaussian filter
   kernelSize = 3
@@ -122,11 +114,12 @@ def denoise(verbose = False, gaussian = True, salted = True):  # 가우시안 �
   #perform NLM filtering
   nlmFilteredGNoised = nonLocalMeans(gNoised, params = (gParams['bigWindow'], gParams['smallWindow'],gParams['h']), verbose = verbose)
 
-  return [gNoised, nlmFilteredGNoised]
+  return [original, gNoised, nlmFilteredGNoised]
 
 imgs = denoise()
-gaussian = imgs[0]
-noiseRemoval = imgs[1]
+original = imgs[0]
+gaussian = imgs[1]
+noiseRemoval = imgs[2]
 
 cv2.imshow('original image', original)
 cv2.imshow('Gaussian noise Add', gaussian)
